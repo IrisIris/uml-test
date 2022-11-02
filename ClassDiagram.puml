@@ -1,0 +1,102 @@
+@startuml
+namespace core {
+    interface Autoscaler  {
+        + Start() error
+        + RunOnce(currentTime time.Time) errors.AutoscalerError
+        + ExitCleanUp() 
+
+    }
+    class AutoscalerOptions << (S,Aquamarine) >> {
+        + KubeClient kubernetes.Interface
+        + EventsKubeClient kubernetes.Interface
+        + AutoscalingKubeClients *context.AutoscalingKubeClients
+        + CloudProvider cloudprovider.CloudProvider
+        + PredicateChecker predicatechecker.PredicateChecker
+        + ClusterSnapshot clustersnapshot.ClusterSnapshot
+        + ExpanderStrategy expander.Strategy
+        + EstimatorBuilder estimator.EstimatorBuilder
+        + Processors *processors.AutoscalingProcessors
+        + Backoff backoff.Backoff
+        + DebuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
+
+    }
+    class StaticAutoscaler << (S,Aquamarine) >> {
+        - clusterStateRegistry *clusterstate.ClusterStateRegistry
+        - lastScaleUpTime time.Time
+        - lastScaleDownDeleteTime time.Time
+        - lastScaleDownFailTime time.Time
+        - scaleDownPlanner scaledown.Planner
+        - scaleDownActuator scaledown.Actuator
+        - processors *processors.AutoscalingProcessors
+        - processorCallbacks *staticAutoscalerProcessorCallbacks
+        - initialized bool
+        - ignoredTaints taints.TaintKeySet
+
+        - cleanUpIfRequired() 
+        - initializeClusterSnapshot(nodes []*v1.Node, scheduledPods []*v1.Pod) errors.AutoscalerError
+        - deleteCreatedNodesWithErrors() (bool, error)
+        - nodeGroupsById() <font color=blue>map</font>[string]cloudprovider.NodeGroup
+        - filterOutYoungPods(allUnschedulablePods []*v1.Pod, currentTime time.Time) []*v1.Pod
+        - obtainNodeLists(cp cloudprovider.CloudProvider) ([]*v1.Node, []*v1.Node, errors.AutoscalerError)
+        - updateClusterState(allNodes []*v1.Node, nodeInfosForGroups <font color=blue>map</font>[string]*framework.NodeInfo, currentTime time.Time) errors.AutoscalerError
+
+        + Start() error
+        + RunOnce(currentTime time.Time) errors.AutoscalerError
+        + ExitCleanUp() 
+
+    }
+    class core.equivalenceGroupId << (T, #FF7700) >>  {
+    }
+    class core.scaleUpResourcesDelta << (T, #FF7700) >>  {
+    }
+    class core.scaleUpResourcesLimits << (T, #FF7700) >>  {
+    }
+    class equivalenceGroup << (S,Aquamarine) >> {
+        - id equivalenceGroupId
+        - representant *v1.Pod
+
+    }
+    class podEquivalenceGroup << (S,Aquamarine) >> {
+        - pods []*v1.Pod
+        - schedulingErrors <font color=blue>map</font>[string]status.Reasons
+        - schedulable bool
+
+    }
+    class scaleUpLimitsCheckResult << (S,Aquamarine) >> {
+        - exceeded bool
+        - exceededResources []string
+
+    }
+    class scaleUpResourcesLimits << (S,Aquamarine) >> {
+        - checkScaleUpDeltaWithinLimits(delta scaleUpResourcesDelta) scaleUpLimitsCheckResult
+
+    }
+    class skippedReasons << (S,Aquamarine) >> {
+        - message []string
+
+        + Reasons() []string
+
+    }
+    class staticAutoscalerProcessorCallbacks << (S,Aquamarine) >> {
+        - disableScaleDownForLoop bool
+        - extraValues <font color=blue>map</font>[string]<font color=blue>interface</font>{}
+        - scaleDownPlanner scaledown.Planner
+
+        - reset() 
+
+        + ResetUnneededNodes() 
+        + DisableScaleDownForLoop() 
+        + SetExtraValue(key string, value <font color=blue>interface</font>{}) 
+        + GetExtraValue(key string) (<font color=blue>interface</font>{}, bool)
+
+    }
+}
+"config.AutoscalingOptions" *-- "core.AutoscalerOptions"
+"context.AutoscalingContext" *-- "core.StaticAutoscaler"
+
+"core.Autoscaler" <|-- "core.StaticAutoscaler"
+
+"__builtin__.<font color=blue>map</font>[string]int64" #.. "core.scaleUpResourcesDelta"
+"__builtin__.<font color=blue>map</font>[string]int64" #.. "core.scaleUpResourcesLimits"
+"__builtin__.int" #.. "core.equivalenceGroupId"
+@enduml
